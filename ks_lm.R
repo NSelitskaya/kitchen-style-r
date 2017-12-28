@@ -30,53 +30,56 @@ ks_lm <- function (df, yname, xnames, full=1, error=0){
   b1 <- solve(t(X) %*% X) %*% t(X) %*% y
   
   if(full | error){
-  e <- X %*% b1 - y
-  model$e2 <- t(e) %*% e
-  model$e2n <- model$e2/nr
-  model$en <- sqrt(model$e2)/nr
+    e <- X %*% b1 - y
+    model$e2 <- t(e) %*% e
+    model$e2n <- model$e2/nr
+    model$en <- sqrt(model$e2)/nr
   }
   
   if(full){
-  #Projection onto 0 member of quotient space X/Y
-  model$R <- diag(rep_len(1, nc))
-  model$R[nc,1:nc] <- b1
-  model$R[nc,nc] <- 0
-  
-  #X to Y Basis rotation
-  #||x||=||y|| (a 0 a)(1 0 1)
-  #a1 <- rep_len(1/sqrt(2),nc)
-  #||y||^2 = 1 (a 0 a)(1 0 1)
-  #a1 <- rep_len(0.5,nc)
-  #||x||=||y|| (a 0 a)(1 0 1/t)
-  #a1 <- sqrt((1+as.vector(b1)**2)/(1+as.vector(b1))**2)
-  #||y||^2 = 1 (a 0 a)(1 0 1/t)
-  #a1 <- sqrt(1/(1+as.vector(b1))**2)
-  #model$Nm1 <- diag(a1)
-  #model$Nm1[,nc] <- a1
-  
-  da1 <- 1/(1+as.vector(b1)**2)
-  model$Nm1 <- diag(da1)
-  #db1 <- 1/(1/as.vector(b1)+as.vector(b1))
-  #model$Nm1[,nc] <- db1
-  dbt1 <- 1/(1/as.vector(b1)**2+1)
-  model$Nm1[,nc] <- dbt1
-
-  model$Nm1 <- model$Nm1[-nc,]
+    model$Xcov <- cov(t(ks_model$X))
     
+    #Projection onto 0 member of quotient space X/Y
+    model$R <- diag(rep_len(1, nc))
+    model$R[nc,1:nc] <- b1
+    model$R[nc,nc] <- 0
   
-  model$h0 <- rep_len(0, nc)
-  model$h0[nc] <- b1[ncol(b1)]
+    #X to Y Basis rotation
+    #||x||=||y|| (a 0 a)(1 0 1)
+    #a1 <- rep_len(1/sqrt(2),nc)
+    #||y||^2 = 1 (a 0 a)(1 0 1)
+    #a1 <- rep_len(0.5,nc)
+    #||x||=||y|| (a 0 a)(1 0 1/t)
+    #a1 <- sqrt((1+as.vector(b1)**2)/(1+as.vector(b1))**2)
+    #||y||^2 = 1 (a 0 a)(1 0 1/t)
+    #a1 <- sqrt(1/(1+as.vector(b1))**2)
+    #model$Nm1 <- diag(a1)
+    #model$Nm1[,nc] <- a1
   
-  model$X0 <- model$R %*% model$X
-  rownames(model$X0) <- all.names
-  model$Xl <- model$X0[, 1:nr] + model$h0
-  rownames(model$Xl) <- all.names
+    da1 <- 1/(1+as.vector(b1)**2)
+    model$Nm1 <- diag(da1)
+    #db1 <- 1/(1/as.vector(b1)+as.vector(b1))
+    #model$Nm1[,nc] <- db1
+    dbt1 <- 1/(1/as.vector(b1)**2+1)
+    model$Nm1[,nc] <- dbt1
+
+    model$Nm1 <- model$Nm1[-nc,]
+    
+
+    model$h0 <- rep_len(0, nc)
+    model$h0[nc] <- b1[ncol(b1)]
   
-  model$Nm1R <- model$Nm1 %*% model$R
-  model$DimNames <- matrix_symvect_mult(model$Nm1R, all.names)
+    model$X0 <- model$R %*% model$X
+    rownames(model$X0) <- all.names
+    model$Xl <- model$X0[, 1:nr] + model$h0
+    rownames(model$Xl) <- all.names
   
-  model$Y <- model$Nm1 %*% model$X0
-  rownames(model$Y) <- model$DimNames
+    model$Nm1R <- model$Nm1 %*% model$R
+    model$DimNames <- matrix_symvect_mult(model$Nm1R, all.names)
+  
+    model$Y <- model$Nm1 %*% model$X0
+    model$Ycov <- cov(t(ks_model$Y))
+    rownames(model$Y) <- model$DimNames
   }
   
   model
@@ -84,17 +87,35 @@ ks_lm <- function (df, yname, xnames, full=1, error=0){
 
 # Reduce dimensionality of dataframe 'df' on variables listed in 'dim'
 # until 'n_dim" dimansions left
-ks_lm_dim_red <- function(df, dim, n_dim=1, reorder=1, sd_dim=0, hb=1){
+ks_lm_dim_red <- function(df, dim=NULL, n_dim=1, 
+                          ord_asc=TRUE, reorder=TRUE, norm=TRUE, eigen=TRUE, 
+                          sd_dim=0, std=TRUE, hb=TRUE){
+  if(identical(dim, NULL)){
+    dim <- colnames(df)
+  }
   clean.df <- df[complete.cases(df[, dim]), dim]
-
-  # normalize variables by their range  
-  n_ds <-lapply(dim, norm_ds, clean.df)
-  names(n_ds) <- dim
-  norm.df <- as.data.frame(n_ds)
+  
+  #rotate dimensions to eigenvectors
+  if(eigen){
+    pc.df <- ks_eigen_rotate(clean.df)
+  }
+  else
+    pc.df <- clean.df
+  
+  # normalize variables by their range
+  if(norm){
+    dim <- colnames(pc.df)
+    n_ds <-lapply(dim, norm_ds, pc.df)
+    names(n_ds) <- dim
+    norm.df <- as.data.frame(n_ds)
+  }
+  else
+    norm.df <- pc.df
   
   #order variables by rss of their univariate regressions
+  dim <- colnames(norm.df)
   v_dim <- sapply(dim, norm_rss_ds, norm.df)
-  i_dim <- order(v_dim[2,])
+  i_dim <- order(v_dim[2,], decreasing = !ord_asc)
   order.df <- norm.df[, i_dim]
   
   # run univariate regressions for variables in rss order 
@@ -113,8 +134,6 @@ ks_lm_dim_red <- function(df, dim, n_dim=1, reorder=1, sd_dim=0, hb=1){
     mod <- ks_lm(ds, resp_name, pred_names)
     ds <- as.data.frame(t(mod$Y))
     
-    #print(names(ds)[1])
-    
     i <- i+1
     if(i >= n_max)
       break
@@ -131,6 +150,10 @@ ks_lm_dim_red <- function(df, dim, n_dim=1, reorder=1, sd_dim=0, hb=1){
       }
     }
     
+    #rotate dimensions to eigenvectors
+    if(eigen)
+      ds <- ks_eigen_rotate_cov(ds)
+    
     #reorder synthetic variables by rss on each iteration
     if(reorder){
       tmp_dim <- colnames(ds)
@@ -141,12 +164,57 @@ ks_lm_dim_red <- function(df, dim, n_dim=1, reorder=1, sd_dim=0, hb=1){
       
   }
   
+  if(std){
+    dim <- colnames(ds)
+    n_ds <- lapply(dim, std_norm_ds, ds)
+    names(n_ds) <- dim
+    ds <- as.data.frame(n_ds)
+  }
+  
+  ds
+}
+
+ks_eigen_rotate_cov <- function(df, std=FALSE){
+  
+  ei <- eigen(cov(df))
+  #print(ei$values)
+  print(ei$vectors)
+  
+  ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
+  colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+  
+  if(std){
+    dim <- colnames(ds)
+    n_ds <- lapply(dim, std_norm_ds, ds)
+    names(n_ds) <- dim
+    ds <- as.data.frame(n_ds)
+  }
+  
+  ds
+}
+
+ks_eigen_rotate_cor <- function(df, std=FALSE){
+  
+  ei <- eigen(cor(df))
+  #print(ei$values)
+  print(ei$vectors)
+  
+  ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
+  colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+  
+  if(std){
+    dim <- colnames(ds)
+    n_ds <-lapply(dim, std_norm_ds, ds)
+    names(n_ds) <- dim
+    ds <- as.data.frame(n_ds)
+  }
+  
   ds
 }
 
 # Create list of rss for univariate regression on each normalized variable
 norm_rss_ds <- function(item, norm.diabetes){
-  i_range <-range(norm.diabetes[,item])
+  i_range <- range(norm.diabetes[,item])
   norm.diabetes[,item] <- norm.diabetes[,item]/(i_range[2]-i_range[1])
   
   predict_dim <- colnames(norm.diabetes)
@@ -160,7 +228,15 @@ norm_rss_ds <- function(item, norm.diabetes){
 
 # Normalize a variable by its range
 norm_ds <- function(item, norm.diabetes){
-  i_range <-range(norm.diabetes[,item])
+  i_range <- range(norm.diabetes[,item])
+  
+  norm_col <- (norm.diabetes[,item])/(i_range[2]-i_range[1])
+  norm_col
+}
+
+# Normalize and standartize to 0-1 a variable by its range
+std_norm_ds <- function(item, norm.diabetes){
+  i_range <- range(norm.diabetes[,item])
   
   norm_col <- (norm.diabetes[,item]-i_range[1])/(i_range[2]-i_range[1])
   norm_col

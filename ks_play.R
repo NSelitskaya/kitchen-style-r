@@ -97,17 +97,67 @@ ks_model$e2
 ks_model$e2n
 ks_model$en
 
+#rownames(ks_model$Y) <- rownames(ks_model$X[1:ncol(ks_model$X)-1])
+#cov(t(ks_model$Y))
+#ei <- eigen(cov(as.data.frame(t(ks_model$X))))
+#ei$vectors
+#ei$values
+
+#cov(as.matrix(as.data.frame(t(ks_model$X))) %*% ei$vectors)
+#cov(t(ks_model$X) %*% ei$vectors)
+
+#t(ei$vectors) %*% rep_len(1,nrow(ei$vectors))
+
+#t(ei$vectors) %*% ks_model$X
+#matrix_symvect_mult(t(ei$vectors), row.names(ks_model$X))
+
+df <- as.data.frame(t(ks_model$X))
+ei <- eigen(cov(df))
+ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
+colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+cov(ds)
+describe(ds[1])
+
+# normalize variables by their range 
+dim <- colnames(ds)
+n_ds <-lapply(dim, norm_ds, ds)
+norm.ds <- as.data.frame(n_ds)
+colnames(norm.ds) <- rownames(ks_model$X)
+cov(norm.ds)
+
+
+
+
 
 # Dimesionality reduction
-diabetes2 <- diabetes
 dim <- c("glyhb", "chol", "hdl", "ratio", "stab.glu", 
          "bp.1s", "bp.1d", "age", "height", "weight",
          "waist", "hip")
+diabetes2 <- diabetes[complete.cases(diabetes[, dim]), dim]
+
+dim3 <- c("chol", "hdl", "ratio", "bp.1s", "bp.1d", "age", 
+         "height", "weight","waist", "hip")
+diabetes3 <- diabetes[complete.cases(diabetes[, dim]), dim3]
+
+
 ds <- ks_lm_dim_red(diabetes2, dim, sd_dim=0.05)
 
-ds <- ks_lm_dim_red(diabetes2, dim, n_dim=3)
+ds <- ks_lm_dim_red(diabetes2, dim, n_dim=2)
 
+ds <- ks_lm_dim_red(diabetes2, dim, n_dim=3, norm=FALSE, std=FALSE, eigen=FALSE)
+ds <- ks_eigen_rotate_cov(ds, std=FALSE)
+ds <- ks_lm_dim_red(ds, eigen=FALSE)
+
+ds <- ks_lm_dim_red(diabetes2, dim, n_dim=3, norm=FALSE, std=FALSE, eigen=FALSE)
+ds <- ks_eigen_rotate_cor(ds, std=FALSE)
+ds <- ks_lm_dim_red(ds, eigen=FALSE)
+
+ds <- ks_lm_dim_red(diabetes2, dim, eigen=FALSE)
 ds <- ks_lm_dim_red(diabetes2, dim)
+
+ds <- ks_eigen_rotate_cor(diabetes3)
+pairs.panels(ds)
+
 
 
 #diabetes2 <- diabetes
@@ -127,14 +177,11 @@ ggplot(ds, aes(x=v1))+
   geom_histogram(data=ds,aes(y=..density..),fill="blue", bins=40, alpha=0.5)+
   geom_density(data=ds,adjust=0.5) 
 
-# +Glycosylated hemoglobin pdf
-clean.diabetes <- diabetes2[complete.cases(diabetes2[, dim]), dim]
-ds$glyhb <- clean.diabetes$glyhb
-ds$glyhb_c <- 0
-ds[ds$glyhb>=7, "glyhb_c"] <- 1
 
-ds_nd <- ds[ds$glyhb<7,]
-ds_pd <- ds[ds$glyhb>=7,]
+# +Glycosylated hemoglobin pdf
+ds$glyhb <- diabetes2$glyhb
+ds_nd <- ds[ds$glyhb<6,]
+ds_pd <- ds[ds$glyhb>=6,]
 
 ggplot(ds, aes(x=v1))+
   geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
@@ -147,10 +194,9 @@ ggplot(ds, aes(x=v1, colour=glyhb))+
   geom_point(data=ds_pd, y=.25, alpha=0.5)+
   scale_colour_gradientn(colours=rainbow(4))
 
-# +Systolic blood pressure pdf
-clean.diabetes <- diabetes2[complete.cases(diabetes2[, dim]), dim]
-ds$bp.1s <- clean.diabetes$bp.1s
 
+# +Systolic blood pressure pdf
+ds$bp.1s <- diabetes2$bp.1s
 ds_nh <- ds[ds$bp.1s<150,]
 ds_ph <- ds[ds$bp.1s>=150,]
 
@@ -159,12 +205,11 @@ ggplot(ds, aes(x=v1))+
   geom_histogram(data=ds_nh, fill="green", bins=40, alpha=0.6)+
   geom_histogram(data=ds_ph, fill="red", bins=40, alpha=0.6)
 
-# +Choleterol pdf
-clean.diabetes <- diabetes2[complete.cases(diabetes2[, dim]), dim]
-ds$chol <- clean.diabetes$chol
 
-ds_nc <- ds[ds$chol<250,]
-ds_pc <- ds[ds$chol>=250,]
+# +Choleterol pdf
+ds$chol <- diabetes2$chol
+ds_nc <- ds[ds$chol<230,]
+ds_pc <- ds[ds$chol>=230,]
 
 ggplot(ds, aes(x=v1))+
   geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
@@ -191,9 +236,87 @@ describe(ds_pd[[1]])
 
 #run immediatelly after ks_lm_dim_red
 names(ds)[1:3] <- c ("v1", "v2", "v3")
-clean.diabetes <- diabetes2[complete.cases(diabetes2[, dim]), dim]
-ds$glyhb <- clean.diabetes$glyhb
+ds$glyhb <- diabetes2$glyhb
 ds$glyhb_c <- 0
 ds[ds$glyhb>=7, "glyhb_c"] <- 1
-cloud(v1 ~ v2 * v3, ds, groups=glyhb_c, pretty=TRUE)
+cloud(v2 ~ v3 * v1, ds, groups=glyhb_c, pretty=TRUE)
 
+
+#run immediatelly after ks_lm_dim_red(dim=2)
+names(ds)[1:2] <- c ("v1", "v2")
+ds$glyhb <- diabetes2$glyhb
+ds_nd <- ds[ds$glyhb<7,]
+ds_pd <- ds[ds$glyhb>=7,]
+
+ggplot(ds, aes(x=v1, y=v2, colour=glyhb))+
+  geom_point(data=ds, alpha=0.5)+
+  geom_point(data=ds_nd, alpha=0.5)+
+  geom_point(data=ds_pd, alpha=0.5)+
+  scale_colour_gradientn(colours=rainbow(4))
+
+
+# PCA. Run immediatelly after eigen rotation
+names(ds) <- c("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8","v9", "v10")
+ds$glyhb <- diabetes2$glyhb
+ds_nd <- ds[ds$glyhb<6,]
+ds_pd <- ds[ds$glyhb>=6,]
+
+ggplot(ds, aes(x=v1))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v1)
+
+ggplot(ds, aes(x=v2))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v2)
+
+ggplot(ds, aes(x=v3))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v3)
+
+ggplot(ds, aes(x=v4))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v4)
+
+ggplot(ds, aes(x=v5))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v5)
+
+ggplot(ds, aes(x=v6))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v6)
+
+ggplot(ds, aes(x=v7))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v7)
+
+ggplot(ds, aes(x=v8))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v8)
+
+ggplot(ds, aes(x=v9))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v9)
+
+ggplot(ds, aes(x=v10))+
+  geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
+  geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+sd(ds$v10)
