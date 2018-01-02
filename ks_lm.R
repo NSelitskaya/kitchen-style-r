@@ -96,19 +96,14 @@ ks_lm_dim_red <- function(df, dim=NULL, n_dim=1,
   clean.df <- df[complete.cases(df[, dim]), dim]
   
   #rotate dimensions to eigenvectors
-  if(eigen){
-    pc.df <- ks_eigen_rotate(clean.df)
-  }
+  if(eigen)
+    pc.df <- ks_eigen_rotate_cov(clean.df)
   else
     pc.df <- clean.df
   
   # normalize variables by their range
-  if(norm){
-    dim <- colnames(pc.df)
-    n_ds <-lapply(dim, norm_ds, pc.df)
-    names(n_ds) <- dim
-    norm.df <- as.data.frame(n_ds)
-  }
+  if(norm)
+    ds <- ks_norm_ds(ds)
   else
     norm.df <- pc.df
   
@@ -164,12 +159,8 @@ ks_lm_dim_red <- function(df, dim=NULL, n_dim=1,
       
   }
   
-  if(std){
-    dim <- colnames(ds)
-    n_ds <- lapply(dim, std_norm_ds, ds)
-    names(n_ds) <- dim
-    ds <- as.data.frame(n_ds)
-  }
+  if(std)
+    ds <- ks_std_ds(ds)
   
   ds
 }
@@ -178,17 +169,13 @@ ks_eigen_rotate_cov <- function(df, std=FALSE){
   
   ei <- eigen(cov(df))
   #print(ei$values)
-  print(ei$vectors)
+  #print(ei$vectors)
   
   ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
   colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
   
-  if(std){
-    dim <- colnames(ds)
-    n_ds <- lapply(dim, std_norm_ds, ds)
-    names(n_ds) <- dim
-    ds <- as.data.frame(n_ds)
-  }
+  if(std)
+    ds <- ks_std_ds(ds)
   
   ds
 }
@@ -197,19 +184,33 @@ ks_eigen_rotate_cor <- function(df, std=FALSE){
   
   ei <- eigen(cor(df))
   #print(ei$values)
-  print(ei$vectors)
+  #print(ei$vectors)
   
   ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
   colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
   
-  if(std){
-    dim <- colnames(ds)
-    n_ds <-lapply(dim, std_norm_ds, ds)
-    names(n_ds) <- dim
-    ds <- as.data.frame(n_ds)
-  }
+  if(std)
+    ds <- ks_std_ds(ds)
   
   ds
+}
+
+ks_norm_ds <- function(ds){
+  dimn <- colnames(ds)
+  n_ds <-lapply(dimn, norm_ds, ds)
+  norm.ds <- as.data.frame(n_ds)
+  colnames(norm.ds) <- dimn
+  
+  norm.ds
+}
+
+ks_std_ds <- function(ds){
+  dimn <- colnames(ds)
+  n_ds <-lapply(dimn, std_norm_ds, ds)
+  norm.ds <- as.data.frame(n_ds)
+  colnames(norm.ds) <- dimn
+  
+  norm.ds
 }
 
 # Create list of rss for univariate regression on each normalized variable
