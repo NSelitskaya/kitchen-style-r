@@ -127,6 +127,8 @@ cov(norm.ds)
 
 
 
+ei <- eigen(cov(diabetes2))
+ei$vectors[,1] %*% ei$vectors[,4]
 
 
 # Dimesionality reduction
@@ -335,6 +337,7 @@ p12 <- ggplot(ds, aes(x=v12))+
   geom_histogram(data=ds, fill="blue", bins=40, alpha=0.6)+
   geom_histogram(data=ds_nd, fill="green", bins=40, alpha=0.6)+
   geom_histogram(data=ds_pd, fill="red", bins=40, alpha=0.6)
+
 
 # Multiple plot function
 #

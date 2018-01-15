@@ -171,13 +171,16 @@ ks_eigen_rotate_cov <- function(df, std=FALSE){
   #print(ei$values)
   #print(ei$vectors)
   
+  #t(ei$vectors) %*% t(as.matrix(df))
   ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
   colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+  model$An1 <- solve(ei$vectors)
   
   if(std)
     ds <- ks_std_ds(ds)
   
-  ds
+  model$ds <- ds
+  model
 }
 
 ks_eigen_rotate_cor <- function(df, std=FALSE){
@@ -188,17 +191,21 @@ ks_eigen_rotate_cor <- function(df, std=FALSE){
   
   ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
   colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+  model$An1 <- solve(ei$vectors)
   
   if(std)
     ds <- ks_std_ds(ds)
   
-  ds
+  model$ds <- ds
+  model
 }
 
 ks_norm_ds <- function(ds){
   dimn <- colnames(ds)
-  n_ds <-lapply(dimn, norm_ds, ds)
+  n_ds <- lapply(dimn, norm_ds, ds)
   norm.ds <- as.data.frame(n_ds)
+  
+  dimn <- sapply(dimn, norm_names_ds, ds)
   colnames(norm.ds) <- dimn
   
   norm.ds
@@ -206,7 +213,7 @@ ks_norm_ds <- function(ds){
 
 ks_std_ds <- function(ds){
   dimn <- colnames(ds)
-  n_ds <-lapply(dimn, std_norm_ds, ds)
+  n_ds <- lapply(dimn, std_norm_ds, ds)
   norm.ds <- as.data.frame(n_ds)
   colnames(norm.ds) <- dimn
   
@@ -230,9 +237,18 @@ norm_rss_ds <- function(item, norm.diabetes){
 # Normalize a variable by its range
 norm_ds <- function(item, norm.diabetes){
   i_range <- range(norm.diabetes[,item])
+
+  scale_v = 1/(i_range[2]-i_range[1])
+  norm_col <- norm.diabetes[,item]*scale_v
   
-  norm_col <- (norm.diabetes[,item])/(i_range[2]-i_range[1])
   norm_col
+}
+
+norm_names_ds <- function(item, norm.diabetes){
+  i_range <- range(norm.diabetes[,item])
+  scale_v = 1/(i_range[2]-i_range[1])
+  
+  sym_lc_mult(item, scale_v)
 }
 
 # Normalize and standartize to 0-1 a variable by its range

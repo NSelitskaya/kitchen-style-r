@@ -53,18 +53,34 @@ p9 <- ggplot(ekg, aes(x=V1))+
 multiplot(p2,p3,p4,p5,p6,p7,p8,p9, cols=1)
 
 
-dim <- c("V2","V3","V4", "V5","V6", "V7", "V8", "V9")
+dim <- c("V2","V3","V4","V5","V6","V7","V8","V9")
 ekg2 <- ekg[, dim]
 
-ds <- ks_eigen_rotate_cov(ekg2)
+pci_model <- ks_eigen_rotate_cov(ekg2)
+ds <- pci_model$ds
 #ds <- ks_norm_ds(ds)
-names(ds) <- c("V2","V3","V4", "V5","V6", "V7", "V8", "V9")
+
+#remove noise
+names(ds) <- c("V2","V3","V4","V5","V6","V7","V8","V9")
+ds$V2 <- mean(ds$V2)
+ds$V3 <- mean(ds$V3)
+ds$V4 <- mean(ds$V4)
+#ds$V5 <- 0
+ds$V7 <- mean(ds$V7)
+#ds$V8 <- 0
+#ds$V9 <- 0
+ds <- as.data.frame(as.matrix(ds) %*% pci_model$An1)
+
+#put time back
+names(ds) <- c("V2","V3","V4","V5","V6","V7","V8","V9")
 ds[,"V1"] <- ekg[,"V1"]
+
 
 describe(ds)
 
+
 p2 <- ggplot(ds, aes(x=V1))+
-  geom_line(aes(y=V2), color="darkblue")+
+  geom_line(aes(y=V2))+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -74,17 +90,17 @@ p3 <- ggplot(ds, aes(x=V1))+
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
 p4 <- ggplot(ds, aes(x=V1))+
-  geom_line(aes(y=V4))+
+  geom_line(aes(y=V4), color="darkblue")+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
 p5 <- ggplot(ds, aes(x=V1))+
-  geom_line(aes(y=V5))+
+  geom_line(aes(y=V5), color="darkgreen")+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
 p6 <- ggplot(ds, aes(x=V1))+
-  geom_line(aes(y=V6), color="darkgreen")+
+  geom_line(aes(y=V6))+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
@@ -99,7 +115,7 @@ p8 <- ggplot(ds, aes(x=V1))+
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
 p9 <- ggplot(ds, aes(x=V1))+
-  geom_line(aes(y=V9), color="red")+
+  geom_line(aes(y=V9))+ #, color="darkred")+
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())

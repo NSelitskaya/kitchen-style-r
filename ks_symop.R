@@ -7,10 +7,11 @@
 ###############################################################
 
 #Examples:
-
+str1 <- "V1"
 str1 <- "2.*a-3.1*b-0.4*c-d"
 str2 <- ".01*c+35*b+3.24*e-5.*d"
 # Symbolic multiplication of string 'str1' by number 2.5
+sym_lc_mult(str1, -3.283654)
 sym_lc_mult(str1, -3.283654e-08)
 # Symbolic sum of 2 strings 'str1' and 'st22'
 sym_lc_add(str1, str2)
@@ -120,6 +121,9 @@ sym_lc_add <- function(str1, str2){
 
 # Symbolic multiplication of string 'str' by number m
 sym_lc_mult <- function(str, m=1){
+  if(identical(str,NULL))
+    return(NULL)
+    
   str_t <- gsub("-","+-", str)
   l_tup <- strsplit(strsplit(str_t, "[+]")[[1]],"[*]")
 
@@ -160,10 +164,10 @@ item_conv <- function(item){
   item
 }
 
-sym_var_mult <- function(item, m=1){
+sym_var_mult <- function(item, m=1, round_len=5){
   item <- item_conv(item)
   
-  mult_res <- as.double(item[1])*m
+  mult_res <- round(as.double(item[1])*m, round_len)
   if(abs(mult_res) < 1e-04)
     mult_res <- 0
   
