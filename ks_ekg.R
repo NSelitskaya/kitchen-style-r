@@ -497,64 +497,11 @@ Cl <- rev(c(1,C))
 Mu3 <- Re(polyroot(Cl))
 
 
-Mu <- ks_kmeans_1d_means(ds, "V6", 5)
-ds <- ks_kmeans_1d_clusters(ds, "V6", Mu)
+Mu <- ks_kmeans_1d_means(ds, "V7", 3)
+ds <- ks_kmeans_1d_clusters(ds, "V7", Mu)
 ggplot(ds, aes(x=V1))+
   geom_point(aes(y=V6, color=Cls, alpha=0.5))+
   scale_colour_gradientn(colours=rainbow(5))
-
-
-ks_kmeans_1d_means <- function(ds, var, k){
-#var = "V4"
-#k = 4
-
-  Xk <- as.matrix(ds[,var]^k)
-  X <- matrix( rep_len(1, nrow(ds)), nrow=nrow(ds), ncol=1 )
-  for(i in 1:(k-1)){
-    X <- cbind(matrix(ds[,var]^i), X)
-  } 
-
-  Xt <- t(X)
-
-  C <- -1 * solve(t(X) %*% X) %*% Xt %*% Xk
-  Cl <- rev(c(1,C))
-
-  Mu <- Re(polyroot(Cl))
-
-  Mu
-}
-
-
-ks_kmeans_1d_clusters <- function(ds, var, Mu){
-#var = "V2"
-
-  k <- length(Mu)
-
-  d <- as.data.frame(ds[,var])
-  names(d) <- c(var)
-
-  for(i in 1:k){
-    d[,as.character(i)] <- (d[,var] - Mu[i])^2
-  }
-  
-  all_lables <- seq(1,k)
-  for(i in 1:k){
-    d[,as.character(k+i)] <- 0 
-    other_lables <- all_lables[-i]
-    for(j in other_lables){
-      # calculate how many times ith distance is smaller than other jth distances
-      d[,as.character(k+i)] <- d[,as.character(k+i)] + as.integer(d[,as.character(i)] < d[,as.character(j)])
-    }
-  }
-
-  for(i in 1:k){
-    d[d[,as.character(k+i)]==(k-1),"Cls"] <- i
-  }
-
-  ds[,"Cls"] <- d[,"Cls"]
-
-  ds
-}
 
   
 # clusterization
