@@ -165,7 +165,7 @@ ks_lm_dim_red <- function(df, dim=NULL, n_dim=1,
   ds
 }
 
-ks_eigen_rotate_cov <- function(df, std=FALSE){
+ks_eigen_rotate_cov <- function(df, std=FALSE, sym=FALSE){
   
   ei <- eigen(cov(df))
   #print(ei$values)
@@ -173,7 +173,9 @@ ks_eigen_rotate_cov <- function(df, std=FALSE){
   
   #t(ei$vectors) %*% t(as.matrix(df))
   ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
-  colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+  if(sym)
+    colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+  model$A <- ei$vectors
   model$An1 <- solve(ei$vectors)
   
   if(std)
@@ -191,6 +193,7 @@ ks_eigen_rotate_cor <- function(df, std=FALSE){
   
   ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
   colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+  model$A <- ei$vectors
   model$An1 <- solve(ei$vectors)
   
   if(std)
