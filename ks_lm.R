@@ -175,6 +175,8 @@ ks_eigen_rotate_cov <- function(df, std=FALSE, sym=FALSE){
   ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
   if(sym)
     colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+  
+  model <- list()
   model$A <- ei$vectors
   model$An1 <- solve(ei$vectors)
   
@@ -193,6 +195,8 @@ ks_eigen_rotate_cor <- function(df, std=FALSE){
   
   ds <- as.data.frame(as.matrix(df) %*% ei$vectors)
   colnames(ds) <- matrix_symvect_mult(t(ei$vectors), names(df))
+  
+  model <- list()
   model$A <- ei$vectors
   model$An1 <- solve(ei$vectors)
   
@@ -268,8 +272,6 @@ norm_sd <- function(item){
 }
 
 ks_kmeans_1d_means <- function(ds, var, k){
-  #var = "V4"
-  #k = 4
   
   Xk <- as.matrix(ds[,var]^k)
   X <- matrix( rep_len(1, nrow(ds)), nrow=nrow(ds), ncol=1 )
@@ -280,38 +282,197 @@ ks_kmeans_1d_means <- function(ds, var, k){
   Xt <- t(X)
   
   C <- -1 * solve(t(X) %*% X) %*% Xt %*% Xk
+  
+  model <- list()
+  model$SSD <- t(Xk + X %*% C) %*% (Xk + X %*% C)
+  
   Cl <- rev(c(1,C))
+  model$Mu <- Re(polyroot(Cl))
   
-  Mu <- Re(polyroot(Cl))
-  
-  Mu
+  model
 }
 
 
-ks_kmeans_1d_clusters <- function(ds, var, Mu){
-  #var = "V2"
+ks_kmeans_1d_clusters <- function(ds, var, Mu, dd_logic=FALSE){
   
   k <- length(Mu)
   
   d <- as.data.frame(ds[,var])
   names(d) <- c(var)
   
-  for(i in 1:k){
-    d[,as.character(i)] <- (d[,var] - Mu[i])^2
-  }
+  # set no cluster association, yet
+  d[,"Cls"] <- 0
+ 
   
   all_lables <- seq(1,k)
-  for(i in 1:k){
-    d[,as.character(k+i)] <- 0 
-    other_lables <- all_lables[-i]
-    for(j in other_lables){
-      # calculate how many times ith distance is smaller than other jth distances
-      d[,as.character(k+i)] <- d[,as.character(k+i)] + as.integer(d[,as.character(i)] < d[,as.character(j)])
+  
+  if(dd_logic){
+    
+    # add disjoint distances form a point to all other jth means (except the current ith one)
+    for(i in 1:k){
+      d[,as.character(i)] <- 1 
+      other_lables <- all_lables[-i]
+      for(j in other_lables){
+        d[,as.character(i)] <- d[,as.character(i)] * (d[,var] - Mu[j])^2
+      }
+    }
+    
+    for(i in 1:k){
+      d[,as.character(k+i)] <- 0 
+      other_lables <- all_lables[-i]
+      for(j in other_lables){
+        # calculate how many times disjoint distance to all but ith mean is bigger than other distances to all but jth means
+        d[,as.character(k+i)] <- d[,as.character(k+i)] + as.integer(d[,as.character(i)] > d[,as.character(j)])
+      }
+    }
+    
+    # mark as particular cluster if ith distance is the smallest
+    for(i in 1:k){
+      d[d[,as.character(k+i)]==(k-1) & d[,"Cls"]==0,"Cls"] <- i
+      
+      # if other cluster is assigned, set it to fuzzy
+      d[d[,as.character(k+i)]==(k-1) & d[,"Cls"]!=i,"Cls"] <- d[d[,as.character(k+i)]==(k-1) & d[,"Cls"]!=i,"Cls"]+k+i
+    }
+    
+  }
+  else{
+    
+    # add distances from a point to each cluster mean
+    for(i in 1:k){
+      d[,as.character(i)] <- (d[,var] - Mu[i])^2
+    }
+
+    for(i in 1:k){
+      d[,as.character(k+i)] <- 0 
+      other_lables <- all_lables[-i]
+      for(j in other_lables){
+        # calculate how many times distance to ith mean is smaller than other distances jth means
+        d[,as.character(k+i)] <- d[,as.character(k+i)] + as.integer(d[,as.character(i)] < d[,as.character(j)])
+      }
+    }
+  
+    # mark as particular cluster if ith distance is the smallest
+    for(i in 1:k){
+      d[d[,as.character(k+i)]==(k-1),"Cls"] <- i
     }
   }
   
-  for(i in 1:k){
-    d[d[,as.character(k+i)]==(k-1),"Cls"] <- i
+  ds[,"Cls"] <- d[,"Cls"]
+  
+  ds
+}
+
+
+ks_kmeans_nd_means <- function(ds, vars, k){
+
+  n <- length(vars)
+  
+  Xk <- as.matrix(ds[,vars[1]]^k)
+  for(l in 2:n){
+    Xk[,1] <- Xk[,1] + ds[,vars[l]]^k
+  }
+  
+  X <- matrix(ds[,vars[1]], nrow=nrow(ds), ncol=1)
+  if(k>=2){
+    for(i in 2:(k-1)){
+      X <- cbind(matrix(ds[,vars[1]]^i), X)
+    }
+  }
+  for(l in 2:n){
+    for(i in 1:(k-1)){
+      X <- cbind(matrix(ds[,vars[l]]^i), X)
+    } 
+  }
+  
+  Xt <- t(X)
+  
+  C <- -1 * solve(Xt %*% X) %*% Xt %*% Xk
+  
+  model <- list()
+  model$SSD <- t(Xk + X %*% C) %*% (Xk + X %*% C)
+  
+  Cl <- rev(c(1, C[1:(k-1)], 0))
+  for(l in 1:(n-1)){ 
+    Cl <- c(rev( c(1, C[((k-1)*l+1):((k-1)*l+k-1)], 0) ), Cl)
+  }
+  Clm <- matrix(Cl, nrow=k+1, ncol=n)
+  
+  model$Mu <- matrix( rep_len(0, n*k), nrow=k, ncol=n )
+  for(l in 1:n){ 
+    model$Mu[,l] <- Re(polyroot(Clm[,l]))
+  }
+  
+  model
+}
+
+ks_kmeans_nd_clusters <- function(ds, vars, Mu, dd_logic=FALSE){
+  #vars = c("V5",V6","V7")
+  
+  n <- length(vars)  
+  k <- nrow(Mu)
+  
+  d <- as.data.frame(ds[,vars])
+  names(d) <- vars
+  
+  # set no cluster association, yet
+  d[,"Cls"] <- 0
+  
+  if(dd_logic){
+    
+    # add disjoint distances form a point to all other jth means (except the current ith one)
+    for(i in 1:k){
+      d[,as.character(i)] <- 1 
+      other_lables <- all_lables[-i]
+      for(j in other_lables){
+        d[,as.character(i)] <- d[,as.character(i)] * (d[,var] - Mu[j])^2
+      }
+    }
+    
+    for(i in 1:k){
+      d[,as.character(k+i)] <- 0 
+      other_lables <- all_lables[-i]
+      for(j in other_lables){
+        # calculate how many times disjoint distance to all but ith mean is bigger than other distances to all but jth means
+        d[,as.character(k+i)] <- d[,as.character(k+i)] + as.integer(d[,as.character(i)] > d[,as.character(j)])
+      }
+    }
+    
+    # mark as particular cluster if ith distance is the smallest
+    for(i in 1:k){
+      d[d[,as.character(k+i)]==(k-1) & d[,"Cls"]==0,"Cls"] <- i
+      
+      # if other cluster is assigned, set it to fuzzy
+      d[d[,as.character(k+i)]==(k-1) & d[,"Cls"]!=i,"Cls"] <- d[d[,as.character(k+i)]==(k-1) & d[,"Cls"]!=i,"Cls"]+k+i
+    }
+    
+  }
+  else{
+    
+    # add distances from a point to each cluster mean
+    for(i in 1:k){
+      d[,as.character(i)] <- (d[,vars[1]] - Mu[i,1])^2
+    }
+    for(l in 2:n){
+      for(i in 1:k){
+        d[,as.character(i)] <- d[,as.character(i)] + (d[,vars[l]] - Mu[i,l])^2
+      }
+    }
+  
+    all_lables <- seq(1,k)
+    
+    for(i in 1:k){
+      d[,as.character(k+i)] <- 0 
+      other_lables <- all_lables[-i]
+      for(j in other_lables){
+        # calculate how many times distance to ith mean is smaller than other distances jth means
+        d[,as.character(k+i)] <- d[,as.character(k+i)] + as.integer(d[,as.character(i)] < d[,as.character(j)])
+      }
+    }
+    
+    # mark as particular cluster if ith distance is the smallest
+    for(i in 1:k){
+      d[d[,as.character(k+i)]==(k-1),"Cls"] <- i
+    }
   }
   
   ds[,"Cls"] <- d[,"Cls"]

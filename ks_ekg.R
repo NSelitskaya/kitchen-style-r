@@ -1,6 +1,7 @@
 install.packages("ggplot2")
 install.packages("lattice")
 install.packages("psych")
+install.packages("rgl")
 
 library("ggplot2")
 library("lattice")
@@ -63,8 +64,8 @@ pca_model <- ks_eigen_rotate_cov(ekg2)
 ds <- pca_model$ds
 #ds_o <- pca_model$ds
 #ds <- ks_norm_ds(ds)
-pca_model$A
-pca_model$An1
+#pca_model$A
+#pca_model$An1
 
 #relable eigenbasis
 names(ds) <- c("V2","V3","V4","V5","V6","V7","V8","V9")
@@ -497,25 +498,66 @@ Cl <- rev(c(1,C))
 Mu3 <- Re(polyroot(Cl))
 
 
-Mu <- ks_kmeans_1d_means(ds, "V7", 3)
-ds <- ks_kmeans_1d_clusters(ds, "V7", Mu)
+# 1-dimension, k-means
+c_model <- ks_kmeans_1d_means(ds, "V6", 8)
+ds <- ks_kmeans_1d_clusters(ds, "V6", c_model$Mu)
+#ds2 <- ks_kmeans_1d_clusters(ds, "V6", c_model$Mu, dd_logic = TRUE)
+#ds3 <- ds - ds2
 ggplot(ds, aes(x=V1))+
   geom_point(aes(y=V6, color=Cls, alpha=0.5))+
   scale_colour_gradientn(colours=rainbow(5))
 
-  
-# clusterization
-ds[,"Cls"] <- 3
-d1 <- (ds$V2-Mu1[1])^2 + (ds$V3-Mu2[1])^2 + (ds$V4-Mu3[1])^2
-d2 <- (ds$V2-Mu1[2])^2 + (ds$V3-Mu2[2])^2 + (ds$V4-Mu3[2])^2
-d3 <- (ds$V2-Mu1[3])^2 + (ds$V3-Mu2[3])^2 + (ds$V4-Mu3[3])^2
-ds[ (d1 < d2) & (d1 < d3), "Cls"] <- 1
-ds[ (d2 < d1) & (d2 < d3), "Cls"] <- 2
 
-ds[,"V1"] <- ekg[,"V1"]
-ggplot(ds, aes(x=V1))+
-  geom_point(aes(y=V2, color=Cls, alpha=0.5))+
+# n-dimension, k-means clustering
+p <- list()
+for(i in 3:7){
+c_model <- ks_kmeans_nd_means(ds, c("V5","V6"), i)
+ds <- ks_kmeans_nd_clusters(ds, c("V5","V6"), c_model$Mu)
+
+mn <- as.data.frame(c_model$Mu)
+names(mn) <- c("V5","V6")
+mn$Cls <- seq(1,nrow(mn))
+
+pd <- ggplot(ds, aes(x=V5, y=V6, colour=Cls))+
+  geom_point(alpha=0.4, show.legend=F)+
+  geom_point(data=mn, alpha=1, size=2, shape=1, stroke=4, show.legend=F)+
+  geom_point(data=mn, alpha=1, size=2, color="white")+
   scale_colour_gradientn(colours=rainbow(4))
+
+  p[[(i-2)*2-1]] <- pd
+}
+
+
+#standard
+for(i in 3:7){
+k_model <- kmeans(ds[,c("V5","V6")], i)
+#k_model$centers
+ds[,"Cls"] <- k_model$cluster
+
+mn <- as.data.frame(k_model$centers)
+#names(mn) <- c("V5","V6")
+mn$Cls <- seq(1,nrow(mn))
+
+pc <- ggplot(ds, aes(x=V5, y=V6, colour=Cls))+
+  geom_point(alpha=0.4, show.legend=F)+
+  geom_point(data=mn, alpha=1, size=2, shape=1, stroke=4, show.legend=F)+
+  geom_point(data=mn, alpha=1, size=2, color="white")+
+  scale_colour_gradientn(colours=rainbow(4))
+
+p[[(i-2)*2]] <- pc
+}
+#l <- matrix(seq(1,10),nrow=2)
+multiplot(plotlist=p, cols=5)
+
+
+
+c_model <- ks_kmeans_nd_means(ds, c("V5","V6","V7"), 4)
+ds <- ks_kmeans_nd_clusters(ds, c("V5","V6","V7"), c_model$Mu)
+
+cloud (V7 ~ V5 * V6, ds, groups=Cls, pretty=TRUE, zoom=0.9,
+       screen = list(x = 90, y = 30, z = 0)) #distance = 1
+
+
 
 
 # create eigen-transform for subset
