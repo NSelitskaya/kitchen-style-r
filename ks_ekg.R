@@ -173,6 +173,8 @@ p9 <- ggplot(ds, aes(x=V1))+
 
 multiplot(p2,p3,p4,p5,p6,p7,p8,p9, cols=1)
 
+multiplot(p2,p5, cols=1)
+
 multiplot(p2,p3,p4,p5,p6,p7,p8,p9, cols=8)
 
   
@@ -508,7 +510,7 @@ ggplot(ds, aes(x=V1))+
   scale_colour_gradientn(colours=rainbow(5))
 
 
-# n-dimension, k-means clustering
+# 2-dimension, k-means clustering
 p <- list()
 for(i in 3:7){
 c_model <- ks_kmeans_nd_means(ds, c("V5","V6"), i)
@@ -550,13 +552,44 @@ p[[(i-2)*2]] <- pc
 multiplot(plotlist=p, cols=5)
 
 
+#including cyclic time
+ds[,"P"] <- -sin(ds[,"V1"]/(10/22.4)*2*pi)*20
+#ds[,"P"] <- -cos((ds[,"V1"]-0.25)/(10/3)*2*pi)*5
+c_model <- ks_kmeans_nd_means(ds, c("V5","V6","V7", "P"), 6)
+ds <- ks_kmeans_nd_clusters(ds, c("V5","V6","V7", "P"), c_model$Mu)
 
-c_model <- ks_kmeans_nd_means(ds, c("V5","V6","V7"), 4)
+# 3-dimension, k-means clustering
+c_model <- ks_kmeans_nd_means(ds, c("V5","V6","V7"), 6)
 ds <- ks_kmeans_nd_clusters(ds, c("V5","V6","V7"), c_model$Mu)
 
-cloud (V7 ~ V5 * V6, ds, groups=Cls, pretty=TRUE, zoom=0.9,
-       screen = list(x = 90, y = 30, z = 0)) #distance = 1
+#standard
+k_model <- kmeans(ds[,c("V5","V6","V7")], 6)
+ds[,"Cls"] <- k_model$cluster
 
+
+cloud (V7 ~ V5 * V6, ds, groups=Cls, pretty=TRUE, zoom=0.9,
+       screen = list(x = 90, y = -30, z = 0)) 
+
+ggplot(ds, aes(x=V1))+
+  geom_point(aes(y=V6, color=Cls))+
+#  geom_point(aes(y=P))+
+  scale_colour_gradientn(colours=rainbow(4))
+
+#persperation
+ds$V2 <- 0 
+ds$V3 <- 0 
+ds$V4 <- 0 
+ds$V8 <- 0 
+ds$V9 <- 0 
+#inverse subset transform
+ts <- as.data.frame(ds[ds$Cls<2,"V1"])
+#ts <- as.data.frame(ds[ds$Cls>1,"V1"])
+names(ts) <- c("V1")
+ds_p <- ds[ds$Cls<2,dim]
+#ds_p <- ds[ds$Cls>1,dim]
+ds <- as.data.frame(as.matrix(ds_p) %*% pca_model$An1)
+names(ds) <- c("V2","V3","V4","V5","V6","V7","V8","V9")
+ds[,"V1"] <- ts[,"V1"]
 
 
 
